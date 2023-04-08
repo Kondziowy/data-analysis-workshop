@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 log = logging.getLogger(__name__)
 
+
 class GeneratorBase:
     # e.g. (x^8*sin(7*x))/(100*x^6)
     def generate(frequency_fun: typing.Callable,
@@ -21,6 +22,8 @@ class GeneratorBase:
 # 127.0.0.1 - - [01/Apr/2023:11:28:10 +0000] "POST /login HTTP/1.1" 302 - 0.014992
 # 127.0.0.1 - - [01/Apr/2023:11:29:05 +0000] "GET /dashboard HTTP/1.1" 200 4369 0.100576
 # 127.0.0.1 - - [01/Apr/2023:11:30:20 +0000] "GET /orders HTTP/1.1" 200 3520 0.006817
+
+
 class ApacheGenerator(GeneratorBase):
     PATTERN = "{source_ip} - - [{timestamp}] \"{method_path} HTTP/1.1\"" \
               " {return_code} {response_size} {response_time}"
@@ -79,5 +82,55 @@ class ApacheGenerator(GeneratorBase):
                                                           return_code=self._draw_status,
                                                           response_size=100000 * random.random(),
                                                           response_time="%.6lf" % random.random()))
-                        
+
         return result
+
+
+class PostgresGenerator(GeneratorBase):
+    """
+    SELECT relname, seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del
+    FROM pg_stat_user_tables
+    WHERE relname = 'orders';
+        relname   | seq_scan | seq_tup_read | idx_scan | idx_tup_fetch | n_tup_ins | n_tup_upd | n_tup_del
+    -------------+----------+--------------+----------+---------------+-----------+-----------+-----------
+    customers   |        4 |         1000 |        1 |           100 |        50 |        20 |        10
+    orders      |        2 |          500 |        2 |           200 |        30 |        40 |        20
+    products    |        5 |         1500 |        3 |           300 |        80 |        10 |         5
+    """
+    pass
+
+
+class PrometheusGenerator(GeneratorBase):
+    """
+    # HELP my_custom_metric A custom metric I created
+    # TYPE my_custom_metric gauge
+    my_custom_metric{label1="value1",label2="value2"} 42.0
+    my_custom_metric{label1="value3",label2="value4"} 17.0
+
+    # HELP http_requests_total The total number of HTTP requests
+    # TYPE http_requests_total counter
+    http_requests_total{method="GET",status="200"} 120
+    http_requests_total{method="POST",status="200"} 35
+    http_requests_total{method="GET",status="404"} 10
+    http_requests_total{method="POST",status="404"} 2
+
+    # HELP cpu_usage The current CPU usage as a percentage
+    # TYPE cpu_usage gauge
+    cpu_usage 75.0
+    """
+    pass
+
+class GunicornGenerator(GeneratorBase):
+    """
+    [2022-04-01 13:37:00 +0000] [12345] [INFO] Listening at: http://0.0.0.0:8000 (12345)
+    [2022-04-01 13:37:00 +0000] [12345] [INFO] Using worker: uvicorn.workers.UvicornWorker
+    [2022-04-01 13:37:00 +0000] [12346] [INFO] Booting worker with pid: 12346
+    [2022-04-01 13:37:01 +0000] [12346] [INFO] Started server process [12346]
+    [2022-04-01 13:37:01 +0000] [12346] [INFO] Waiting for application startup.
+    [2022-04-01 13:37:01 +0000] [12346] [INFO] Application startup complete.
+    [2022-04-01 13:37:00 +0000] [12345] [ellen] [api.py:85] [INFO] GET /documents?page=X&per_page=Y&filter=Z 200 3520 0.006817
+    [2022-04-01 13:37:00 +0000] [12345] [] [api.py:86] [INFO] Recording operation GET from user ellen
+    [2022-04-01 13:37:00 +0000] [12345] [ellen] [api.py:85] [INFO] GET /users 200 3128 0.006817
+    
+    """
+    pass

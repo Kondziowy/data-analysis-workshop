@@ -1,9 +1,9 @@
 from collections import OrderedDict
 import logging
 import random
-import time
+import math
 import typing
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -73,14 +73,15 @@ class ApacheGenerator(GeneratorBase):
         result = []
         while timestamp < end_date:
             timestamp += timedelta(seconds=1)
-            draws = frequency_fun(time.time())
+            draws = frequency_fun(timestamp.timestamp())
             log.debug("Generating %s samples for ts %s", draws, timestamp)
             for _ in range(draws):
+                # TODO: convert to yield
                 result.append(self.PATTERN.format(source_ip="127.0.0.1",
-                                                          timestamp=timestamp,
-                                                          method_path=self._draw_method,
-                                                          return_code=self._draw_status,
-                                                          response_size=100000 * random.random(),
+                                                          timestamp=timestamp.strftime("%d/%b/%Y:%H:%M:%S %z"),
+                                                          method_path=self._draw_method(),
+                                                          return_code=self._draw_status(),
+                                                          response_size=int(100000 * random.random()),
                                                           response_time="%.6lf" % random.random()))
 
         return result
@@ -134,3 +135,15 @@ class GunicornGenerator(GeneratorBase):
     
     """
     pass
+
+
+if __name__ == '__main__':
+    start = datetime(2020,4,3,12,0,0, tzinfo=timezone.utc)
+    end = datetime(2020,4,3,12,10,0, tzinfo=timezone.utc)
+    # Remember x is float
+    frequency_fun = lambda x: int((x**8 * math.sin(7 * x))/(100*x**6)) % 10
+
+    g = ApacheGenerator()
+    result = g.generate(frequency_fun, start, end)
+    with open("apache.log.big", "w") as f:
+        f.write("\n".join(result))

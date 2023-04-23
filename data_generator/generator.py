@@ -31,8 +31,8 @@ class ApacheGenerator(GeneratorBase):
 
     method_probabilities = OrderedDict({
         0.1: "GET /",
-        0.2: "GET /favicon.ico",
-        0.3: "GET /images/logo.png",
+        0.2: "GET /static/favicon.ico",
+        0.3: "GET /static/images/logo.png",
         0.4: "GET /static/style.css",
         0.5: "GET /static/bootstrap.min.js",
         0.6: "GET /static/jquery-3.3.1.slim.min.js",
@@ -68,21 +68,23 @@ class ApacheGenerator(GeneratorBase):
             if method_seed < key:
                 return value
 
-    def generate(self, frequency_fun: typing.Callable, start_date: datetime, end_date: datetime) -> list[str]:
+    def generate(self, frequency_fun: typing.Callable, start_date: datetime, end_date: datetime,
+                 length_fun: typing.Callable = random.random) -> list[str]:
         timestamp = start_date
         result = []
         while timestamp < end_date:
             timestamp += timedelta(seconds=1)
-            draws = frequency_fun(timestamp.timestamp())
+            draws = frequency_fun(timestamp)
             log.debug("Generating %s samples for ts %s", draws, timestamp)
             for _ in range(draws):
                 # TODO: convert to yield
-                result.append(self.PATTERN.format(source_ip="127.0.0.1",
+                method = self._draw_method()
+                result.append(self.PATTERN.format(source_ip=f"192.168.{random.randrange(0,253)}.{random.randrange(0,253)}",
                                                           timestamp=timestamp.strftime("%d/%b/%Y:%H:%M:%S %z"),
-                                                          method_path=self._draw_method(),
+                                                          method_path=method,
                                                           return_code=self._draw_status(),
-                                                          response_size=int(100000 * random.random()),
-                                                          response_time="%.6lf" % random.random()))
+                                                          response_size=int(100000 * random.random()) if "GET" in method else "",
+                                                          response_time="%.3lf" % length_fun(timestamp, method)))
 
         return result
 
@@ -137,13 +139,26 @@ class GunicornGenerator(GeneratorBase):
     pass
 
 
+def frequency_function(d: datetime) -> int:
+    # int((x**8 * math.sin(7 * x))/(100*x**6)) % 10
+    multiplier = 1
+    if d.hour > 8 and d.hour < 16:
+        multiplier = 2
+    return random.randrange(10) * multiplier
+
+def length_function(d: datetime, method: str) -> int:
+    multiplier = 1
+    if d > datetime(2020,4,3,13,00,0, tzinfo=timezone.utc) and not "static" in method:
+        multiplier = 4
+
+    return multiplier * random.random()
+
 if __name__ == '__main__':
-    start = datetime(2020,4,3,12,0,0, tzinfo=timezone.utc)
-    end = datetime(2020,4,3,12,10,0, tzinfo=timezone.utc)
-    # Remember x is float
-    frequency_fun = lambda x: int((x**8 * math.sin(7 * x))/(100*x**6)) % 10
+    start = datetime(2020,4,2,12,0,0, tzinfo=timezone.utc)
+    end = datetime(2020,4,3,13,10,0, tzinfo=timezone.utc)
+
 
     g = ApacheGenerator()
-    result = g.generate(frequency_fun, start, end)
-    with open("apache.log.big", "w") as f:
+    result = g.generate(frequency_function, start, end, length_function)
+    with open("apache.log.big3", "w") as f:
         f.write("\n".join(result))

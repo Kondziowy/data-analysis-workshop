@@ -3,6 +3,7 @@ import logging
 import random
 import math
 import typing
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 logging.basicConfig(level=logging.DEBUG)
@@ -100,7 +101,29 @@ class PostgresGenerator(GeneratorBase):
     orders      |        2 |          500 |        2 |           200 |        30 |        40 |        20
     products    |        5 |         1500 |        3 |           300 |        80 |        10 |         5
     """
-    pass
+
+
+    def generate(self, frequency_fun: typing.Callable, start_date: datetime, end_date: datetime,
+                 length_fun: typing.Callable = random.random) -> list[str]:   
+        timestamp = start_date
+        result = []
+        tables = ['documents', 'permissions', 'users']
+        initial_budget = 200
+        current_budget = initial_budget
+        while timestamp < end_date:
+            timestamp += timedelta(seconds=5)
+            # a bit of play
+            current_budget = initial_budget + random.randint(-20, 20)
+            for table in tables:
+                tuples_read = random.randint(0, current_budget)
+                current_budget -= tuples_read
+                tuples_write = random.randint(0, current_budget)
+                current_budget -= tuples_write
+                result.append((timestamp.strftime("%Y-%m-%d %H:%M:%S.000"), table, tuples_read, tuples_write))
+            if timestamp > datetime(2020,4,3,13,00,0, tzinfo=timezone.utc) and "audit_log" not in tables:
+                tables.insert(0, "audit_log")
+        return result
+
 
 
 class PrometheusGenerator(GeneratorBase):
@@ -143,22 +166,38 @@ def frequency_function(d: datetime) -> int:
     # int((x**8 * math.sin(7 * x))/(100*x**6)) % 10
     multiplier = 1
     if d.hour > 8 and d.hour < 16:
-        multiplier = 2
-    return random.randrange(10) * multiplier
+        multiplier = abs(-0.25*(d.hour - 12)**2 + 2)
+    return math.ceil(random.randrange(10) * multiplier)
 
 def length_function(d: datetime, method: str) -> int:
     multiplier = 1
+    if d.hour > 8 and d.hour < 16:
+        multiplier = abs(-0.25*(d.hour - 12)**2 + 2)
     if d > datetime(2020,4,3,13,00,0, tzinfo=timezone.utc) and not "static" in method:
         multiplier = 4
 
     return multiplier * random.random()
 
 if __name__ == '__main__':
-    start = datetime(2020,4,2,12,0,0, tzinfo=timezone.utc)
-    end = datetime(2020,4,3,13,10,0, tzinfo=timezone.utc)
+    start = datetime(2020,4,2,8,0,0, tzinfo=timezone.utc)
+    end = datetime(2020,4,3,16,10,0, tzinfo=timezone.utc)
 
 
-    g = ApacheGenerator()
-    result = g.generate(frequency_function, start, end, length_function)
-    with open("apache.log.big3", "w") as f:
-        f.write("\n".join(result))
+    # g = ApacheGenerator()
+    # result = g.generate(frequency_function, start, end, length_function)
+    # with open("apache.log.big4", "w") as f:
+    #     f.write("\n".join(result))
+
+    p = PostgresGenerator()
+    result = p.generate(frequency_function, start, end, length_function)
+    print(f"Generated {len(result)} rows of sql data")
+    conn = sqlite3.connect('tps_database.db')
+    # TODO: check if table exists
+    # print(result[:5])
+    # Create a cursor object to execute SQL queries
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE if not exists db_activity (timestamp TEXT NOT NULL, table_name TEXT NOT NULL, tuples_read INTEGER NOT NULL, tuples_write INTEGER NULL)")
+    for row in result:
+        cursor.execute(f"INSERT INTO db_activity VALUES ('{row[0]}', '{row[1]}', {row[2]}, {row[3]})")
+    conn.commit()
+    # print(cursor.execute("SELECT * from db_activity").fetchone())

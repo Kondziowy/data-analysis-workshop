@@ -39,6 +39,7 @@ class ApacheGenerator(GeneratorBase):
         0.6: "GET /static/jquery-3.3.1.slim.min.js",
         0.65: "POST /login",
         0.70: "POST /documents",
+        # TODO: randomize paging
         0.75: "GET /documents?page=X&per_page=Y&filter=Z",
         0.80: "GET /document?id=X",
         0.85: "GET /users",

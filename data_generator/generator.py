@@ -201,4 +201,4 @@ if __name__ == '__main__':
     for row in result:
         cursor.execute(f"INSERT INTO db_activity VALUES ('{row[0]}', '{row[1]}', {row[2]}, {row[3]})")
     conn.commit()
-    # print(cursor.execute("SELECT * from db_activity").fetchone())
+    print(cursor.execute("SELECT * from db_activity").fetchone())

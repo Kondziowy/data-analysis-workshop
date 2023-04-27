@@ -1,4 +1,7 @@
 @startuml
+
+cloud Github
+
 package "Front End" {
   [Nginx]
 }
@@ -7,12 +10,10 @@ package "Back End" {
   Nginx --> [Gunicorn]
 }
 
-package "Back End 2" {
-  Nginx --> [Gunicorn2]
-}
-
 package "Database" { 
 Gunicorn --> [PostgreSQL]
-Gunicorn2 --> [PostgreSQL]
 }
+
+Github ..> Gunicorn
+
 @enduml
